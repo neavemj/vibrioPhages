@@ -147,6 +147,7 @@ dark2 = brewer2mpl.get_map('Dark2', 'qualitative', 8).mpl_colors
 arrowColorDict = {'Oth':"white", 'fib':dark2[1], 'PLP':dark2[2], 'Int':"red", 'RNA':"pink", 'Por':dark2[3], 'Hyp':dark2[4],
                   'sha':dark2[5], 'Att':"black", 'Coa':dark2[6], 'Pla':dark2[7], 'Ter':dark2[0]}
 
+# check how many gene types from PHAST
 # typeSet = set()
 #
 # for phage in phageDict:
@@ -175,5 +176,5 @@ for phage in phageDict:
 # ok now draw diagram
 
 genomeDiag.draw(format='linear', pagesize=(60*cm, 40*cm), fragments=1, start=0, end=max_len)
-genomeDiag.write("phageLinear.pdf", "pdf")
-genomeDiag.write("phageLinear.svg", "svg")
+genomeDiag.write("phageLinearSim.pdf", "pdf")
+genomeDiag.write("phageLinearSim.svg", "svg")
