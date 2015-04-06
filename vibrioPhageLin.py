@@ -19,6 +19,7 @@ phage_regions_file = '/Users/neavemj/otherProjects/vibrioCoral/4.17.2.15/PHAST_p
 
 max_len = 0
 phageDict = {}
+phageMaxLengths = {}
 phageList = []
 
 for phage_regions in open(phage_regions_file):
@@ -29,6 +30,7 @@ for phage_regions in open(phage_regions_file):
     phageDict[phage_regions] = {}
     lineCount = 0
     total_len = 0
+
     for line in phage_handle:
         lineCount += 1
         line = line.strip()
@@ -52,10 +54,21 @@ for phage_regions in open(phage_regions_file):
             stopRegion = int(region[1]) - initPosition
             total_len = max(total_len, stopRegion)
             phageDict[phage_regions][geneNum] = {"start" : startRegion, "stop" : stopRegion}
-    phageDict[phage_regions]["totalLength"] = total_len
+    phageMaxLengths[phage_regions] = total_len
 
 
-print phageDict
+## take the reverse complement of a couple of phages so it looks better
+
+phageToRevComplement = ["OCN008_K139_region.fa", "RE98_web_2_ep3.fa"]
+
+for phageRev in phageToRevComplement:
+    for genes in phageDict[phageRev]:
+        phageDict[phageRev][genes]["start"] = phageMaxLengths[phageRev] - phageDict[phageRev][genes]["start"]
+        phageDict[phageRev][genes]["stop"] = phageMaxLengths[phageRev] - phageDict[phageRev][genes]["stop"]
+        if "rev" in phageDict[phageRev][genes]:
+            del phageDict[phageRev][genes]["rev"]
+        else:
+            phageDict[phageRev][genes]["rev"] = "True"
 
 
 # ok create the genome diagram and tracks for each phage
@@ -63,70 +76,96 @@ print phageDict
 genomeDiag = GenomeDiagram.Diagram("vibrioPhages")
 
 for genome in phageList:
-    genomeTrack = genomeDiag.new_track(1, name=genome, greytrack=True, start=0, end=phageDict[genome]["totalLength"])
-
+    genomeTrack = genomeDiag.new_track(1, name=genome, greytrack=True, start=0, end=phageMaxLengths[genome])
 
 # dictionary to translate phage name into track number
 
-phageTrack = {"BAA450_VCY_region.fa" : 9, "P1_4_VCY.fa" : 8, "RE98_web_1_kappa.fa" : 7, "OCN008_K139_region.fa" : 6, "P1_1_KS14.fa" : 5, "P1_3_Yersin.fa" : 4, "RE98_web_2_ep3.fa" : 3, "P1_2_CTX.fa" : 2, "OCN014_VP882_region.fa" : 1}
+phageTrack = {"BAA450" : 9, "P1_4" : 8, "RE98_1" : 7, "OCN008" : 6, "P1_1" : 5, "P1_3" : 4, "RE98_2" : 3, "P1_2" : 2, "OCN014" : 1}
+phageFullNameConvert = {"BAA450" : "BAA450_VCY_region.fa", "P1_4" : "P1_4_VCY.fa", "RE98_1" : "RE98_web_1_kappa.fa", "OCN008": "OCN008_K139_region.fa", "P1_1" : "P1_1_KS14.fa", "P1_3" : "P1_3_Yersin.fa", "RE98_2" : "RE98_web_2_ep3.fa", "P1_2" : "P1_2_CTX.fa", "OCN014" : "OCN014_VP882_region.fa"}
+fullNameToNum = {"BAA450_VCY_region.fa" : 9, "P1_4_VCY.fa" : 8, "RE98_web_1_kappa.fa" : 7, "OCN008_K139_region.fa" : 6, "P1_1_KS14.fa" : 5, "P1_3_Yersin.fa" : 4, "RE98_web_2_ep3.fa" : 3, "P1_2_CTX.fa" : 2, "OCN014_VP882_region.fa" : 1}
+
+
+# add the gene arrows
+# if else statement to separate out genes in the reverse direction
+
+for phage in phageDict:
+    genomeSet = genomeDiag.tracks[fullNameToNum[phage]].new_set()
+    for geneRegion in phageDict[phage]:
+        if "rev" in phageDict[phage][geneRegion]:
+            feature = SeqFeature(FeatureLocation(phageDict[phage][geneRegion]["start"], phageDict[phage][geneRegion]["stop"]), strand=-1)
+        else:
+            feature = SeqFeature(FeatureLocation(phageDict[phage][geneRegion]["start"], phageDict[phage][geneRegion]["stop"]), strand=+1)
+
+        genomeSet.add_feature(feature, label=True, name=str(geneRegion), label_position="start", sigil="ARROW", color='gray')
+
 
 
 # read in all-vs-all blast results to create links between similar genes
 # file should be first gene name, second gene name then percent similarity
-# want to add these links first so that the arrows go over the top
+# i'll add these over the top then re-draw arrows with different color
 
 links_file_handle = open("/Users/neavemj/otherProjects/vibrioCoral/4.17.2.15/PHAST_phage_finder/3.allVsall/links.txt")
 links_dir = '/Users/neavemj/otherProjects/vibrioCoral/4.17.2.15/PHAST_phage_finder/3.allVsall/'
 
 
-for link_tracks in open(links_file_handle):
+for link_tracks in links_file_handle:
     link_tracks = link_tracks.strip()
     links_handle = open(links_dir + link_tracks)
-
-
-    track_1 = genomeDiag.tracks[phageTrack[link_tracks]]
 
     for connection in links_handle:
         connection = connection.strip()
         values = connection.split("\t")
-        track_1_start = float(values[0])
-        track_1_end = float(values[1])
-        track_2_start = float(values[2])
-        track_2_end = float(values[3])
+
+        phage1 = values[0]
+        phage1Full = phageFullNameConvert[phage1]
+        phage1_gene = int(values[1])
+        phage2 = values[2]
+        phage2Full = phageFullNameConvert[phage2]
+        phage2_gene = int(values[3])
         score = float(values[4])
 
+        track1 = genomeDiag.tracks[phageTrack[phage1]]
+        track2 = genomeDiag.tracks[phageTrack[phage2]]
+
+        color = colors.linearlyInterpolatedColor(colors.white, colors.firebrick, 0, 100, score)
+
+        if phage1 == "P1_1":
+            link_xy = CrossLink((track1, phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"]), (track2, phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"]), color=color, flip=False)
+        else:
+            link_xy = CrossLink((track1, phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"]), (track2, phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"]), color=color, flip=True)
+
+        # add link features to first track
+
+        BoxFeatureTrack1 = SeqFeature(FeatureLocation(phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"], strand=0))
+
+        if "rev" in phageDict[phage1Full][phage1_gene]:
+            feature = SeqFeature(FeatureLocation(phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"], strand=-1))
+        else:
+            feature = SeqFeature(FeatureLocation(phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"], strand=+1))
+
+        genomeSet = track1.new_set()
+        genomeSet.add_feature(BoxFeatureTrack1, label=False, label_position="start", sigil="BOX", color=color)
+        genomeSet.add_feature(feature, label=False, label_position="start", sigil="ARROW", color="blue")
+        genomeDiag.cross_track_links.append(link_xy)
+
+        # add link features to second track
+
+        BoxFeatureTrack2 = SeqFeature(FeatureLocation(phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"], strand=0))
+
+        if "rev" in phageDict[phage2Full][phage2_gene]:
+            feature = SeqFeature(FeatureLocation(phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"], strand=-1))
+        else:
+            feature = SeqFeature(FeatureLocation(phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"], strand=+1))
 
 
-track_BAA450 = genomeDiag.tracks[9]
-track_P1_4 = genomeDiag.tracks[8]
-
-for connection in BAAvsP1_4_handle:
-    connection = connection.strip()
-    values = connection.split("\t")
-    track_BAA450_start = float(values[0])
-    track_BAA450_end = float(values[1])
-    track_P1_4_start = float(values[2])
-    track_P1_4_end = float(values[3])
-    score = float(values[4])
-
-    color = colors.linearlyInterpolatedColor(colors.white, colors.firebrick, 0, 100, score)
-    link_xy = CrossLink((track_BAA450, track_BAA450_start, track_BAA450_end), (track_P1_4, track_P1_4_start, track_P1_4_end), color=color)
-
-    feature = SeqFeature(FeatureLocation(int(track_BAA450_start), int(track_BAA450_end), strand=0))
-    genomeSet = track_BAA450.new_set()
-    genomeSet.add_feature(feature, label=False, label_position="start", sigil="BOX", color=color)
+        genomeSet = track2.new_set()
+        genomeSet.add_feature(BoxFeatureTrack2, label=False, label_position="start", sigil="BOX", color=color)
+        genomeSet.add_feature(feature, label=False, label_position="start", sigil="ARROW", color="blue")
+        genomeDiag.cross_track_links.append(link_xy)
 
 
-    genomeDiag.cross_track_links.append(link_xy)
+# ok now draw diagram
 
-
-
-# feature = SeqFeature(FeatureLocation(startRegion, stopRegion), strand=-1)
-# feature = SeqFeature(FeatureLocation(startRegion, stopRegion), strand=+1)
-#
-# genomeSet = genomeTrack.new_set()
-# genomeSet.add_feature(feature, name=name, label=False, label_position="start", sigil="ARROW")
-#
-# genomeDiag.draw(format='linear', pagesize=("A4"), fragments=1, start=0, end=max_len)
-# genomeDiag.write("phageLinear.pdf", "pdf")
-# genomeDiag.write("phageLinear.svg", "svg")
+genomeDiag.draw(format='linear', pagesize=(60*cm, 40*cm), fragments=1, start=0, end=max_len)
+genomeDiag.write("phageLinear.pdf", "pdf")
+genomeDiag.write("phageLinear.svg", "svg")
