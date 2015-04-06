@@ -9,7 +9,7 @@ from Bio.Graphics import GenomeDiagram
 from Bio.Graphics.GenomeDiagram import CrossLink
 from reportlab.lib import colors
 from reportlab.lib.units import cm
-
+import brewer2mpl
 
 # first read through PHAST results and extract information
 # dictionary structure is: {phage : {geneNum : {start : 1, stop : 100, name : hypoth}, totalLength : 10000 } }
@@ -36,6 +36,7 @@ for phage_regions in open(phage_regions_file):
         line = line.strip()
         cols = line.split()
         geneNum = lineCount
+        geneType = cols[2]
         region = cols[0]
         if region.startswith("complement"):
             region = region.lstrip("complement(").rstrip(")").split("..")
@@ -44,7 +45,7 @@ for phage_regions in open(phage_regions_file):
             startRegion = int(region[0]) - initPosition
             stopRegion = int(region[1]) - initPosition
             total_len = max(total_len, stopRegion)
-            phageDict[phage_regions][geneNum] = {"start" : startRegion, "stop" : stopRegion, "rev" : True}
+            phageDict[phage_regions][geneNum] = {"start" : startRegion, "stop" : stopRegion, "rev" : True, "geneType" : geneType}
 
         else:
             region = region.split("..")
@@ -53,7 +54,7 @@ for phage_regions in open(phage_regions_file):
             startRegion = int(region[0]) - initPosition
             stopRegion = int(region[1]) - initPosition
             total_len = max(total_len, stopRegion)
-            phageDict[phage_regions][geneNum] = {"start" : startRegion, "stop" : stopRegion}
+            phageDict[phage_regions][geneNum] = {"start" : startRegion, "stop" : stopRegion, "geneType" : geneType}
     phageMaxLengths[phage_regions] = total_len
 
 
@@ -76,7 +77,7 @@ for phageRev in phageToRevComplement:
 genomeDiag = GenomeDiagram.Diagram("vibrioPhages")
 
 for genome in phageList:
-    genomeTrack = genomeDiag.new_track(1, name=genome, greytrack=True, start=0, end=phageMaxLengths[genome])
+    genomeTrack = genomeDiag.new_track(1, name=genome, greytrack=False, start=0, end=phageMaxLengths[genome])
 
 # dictionary to translate phage name into track number
 
@@ -85,24 +86,9 @@ phageFullNameConvert = {"BAA450" : "BAA450_VCY_region.fa", "P1_4" : "P1_4_VCY.fa
 fullNameToNum = {"BAA450_VCY_region.fa" : 9, "P1_4_VCY.fa" : 8, "RE98_web_1_kappa.fa" : 7, "OCN008_K139_region.fa" : 6, "P1_1_KS14.fa" : 5, "P1_3_Yersin.fa" : 4, "RE98_web_2_ep3.fa" : 3, "P1_2_CTX.fa" : 2, "OCN014_VP882_region.fa" : 1}
 
 
-# add the gene arrows
-# if else statement to separate out genes in the reverse direction
-
-for phage in phageDict:
-    genomeSet = genomeDiag.tracks[fullNameToNum[phage]].new_set()
-    for geneRegion in phageDict[phage]:
-        if "rev" in phageDict[phage][geneRegion]:
-            feature = SeqFeature(FeatureLocation(phageDict[phage][geneRegion]["start"], phageDict[phage][geneRegion]["stop"]), strand=-1)
-        else:
-            feature = SeqFeature(FeatureLocation(phageDict[phage][geneRegion]["start"], phageDict[phage][geneRegion]["stop"]), strand=+1)
-
-        genomeSet.add_feature(feature, label=True, name=str(geneRegion), label_position="start", sigil="ARROW", color='gray')
-
-
-
 # read in all-vs-all blast results to create links between similar genes
 # file should be first gene name, second gene name then percent similarity
-# i'll add these over the top then re-draw arrows with different color
+# i'll add these first so the arrows come out on top
 
 links_file_handle = open("/Users/neavemj/otherProjects/vibrioCoral/4.17.2.15/PHAST_phage_finder/3.allVsall/links.txt")
 links_dir = '/Users/neavemj/otherProjects/vibrioCoral/4.17.2.15/PHAST_phage_finder/3.allVsall/'
@@ -138,30 +124,52 @@ for link_tracks in links_file_handle:
 
         BoxFeatureTrack1 = SeqFeature(FeatureLocation(phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"], strand=0))
 
-        if "rev" in phageDict[phage1Full][phage1_gene]:
-            feature = SeqFeature(FeatureLocation(phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"], strand=-1))
-        else:
-            feature = SeqFeature(FeatureLocation(phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"], strand=+1))
-
         genomeSet = track1.new_set()
         genomeSet.add_feature(BoxFeatureTrack1, label=False, label_position="start", sigil="BOX", color=color)
-        genomeSet.add_feature(feature, label=False, label_position="start", sigil="ARROW", color="blue")
         genomeDiag.cross_track_links.append(link_xy)
 
         # add link features to second track
 
         BoxFeatureTrack2 = SeqFeature(FeatureLocation(phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"], strand=0))
 
-        if "rev" in phageDict[phage2Full][phage2_gene]:
-            feature = SeqFeature(FeatureLocation(phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"], strand=-1))
-        else:
-            feature = SeqFeature(FeatureLocation(phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"], strand=+1))
-
-
         genomeSet = track2.new_set()
         genomeSet.add_feature(BoxFeatureTrack2, label=False, label_position="start", sigil="BOX", color=color)
-        genomeSet.add_feature(feature, label=False, label_position="start", sigil="ARROW", color="blue")
         genomeDiag.cross_track_links.append(link_xy)
+
+
+
+
+# colors for the arrows - currently similar to the PHAST website
+
+dark2 = brewer2mpl.get_map('Dark2', 'qualitative', 8).mpl_colors
+
+
+arrowColorDict = {'Oth':"white", 'fib':dark2[1], 'PLP':dark2[2], 'Int':"red", 'RNA':"pink", 'Por':dark2[3], 'Hyp':dark2[4],
+                  'sha':dark2[5], 'Att':"black", 'Coa':dark2[6], 'Pla':dark2[7], 'Ter':dark2[0]}
+
+# typeSet = set()
+#
+# for phage in phageDict:
+#     for geneRegion in phageDict[phage]:
+#         typeSet.add(phageDict[phage][geneRegion]["geneType"])
+#
+# print typeSet
+
+
+# add the gene arrows
+# if else statement to separate out genes in the reverse direction
+
+for phage in phageDict:
+    genomeSet = genomeDiag.tracks[fullNameToNum[phage]].new_set()
+    for geneRegion in phageDict[phage]:
+        if "rev" in phageDict[phage][geneRegion]:
+            feature = SeqFeature(FeatureLocation(phageDict[phage][geneRegion]["start"], phageDict[phage][geneRegion]["stop"]), strand=-1)
+        else:
+            feature = SeqFeature(FeatureLocation(phageDict[phage][geneRegion]["start"], phageDict[phage][geneRegion]["stop"]), strand=+1)
+
+        genomeSet.add_feature(feature, label=True, name=str(geneRegion), label_position="start", sigil="ARROW", color=arrowColorDict[phageDict[phage][geneRegion]["geneType"]])
+
+
 
 
 # ok now draw diagram
