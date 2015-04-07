@@ -91,12 +91,12 @@ genomeDiag = GenomeDiagram.Diagram("vibrioPhages")
 
 for genome in phageList:
     if genome == "P1_1_KS14.fa":
-        genomeTrack = genomeDiag.new_track(1, name=genome, greytrack=False, start=phageMaxLengths["OCN008_K139_region.fa"] - phageMaxLengths["P1_1_KS14.fa"], end=phageMaxLengths["OCN008_K139_region.fa"], height = 0.4)
+        genomeTrack = genomeDiag.new_track(1, name=genome, greytrack=True, start=phageMaxLengths["OCN008_K139_region.fa"] - phageMaxLengths["P1_1_KS14.fa"], end=phageMaxLengths["OCN008_K139_region.fa"], height = 0.4)
     elif genome == "P1_3_Yersin.fa":
-        genomeTrack = genomeDiag.new_track(1, name=genome, greytrack=False, start=phageMaxLengths["OCN008_K139_region.fa"] - phageMaxLengths["P1_3_Yersin.fa"], end=phageMaxLengths["OCN008_K139_region.fa"], height = 0.4)
+        genomeTrack = genomeDiag.new_track(1, name=genome, greytrack=True, start=phageMaxLengths["OCN008_K139_region.fa"] - phageMaxLengths["P1_3_Yersin.fa"], end=phageMaxLengths["OCN008_K139_region.fa"], height = 0.4)
 
     else:
-        genomeTrack = genomeDiag.new_track(1, name=genome, greytrack=False, start=0, end=phageMaxLengths[genome], height = 0.4)
+        genomeTrack = genomeDiag.new_track(1, name=genome, greytrack=True, start=0, end=phageMaxLengths[genome], height = 0.4)
 
 # dictionary to translate phage name into track number
 
@@ -131,7 +131,7 @@ for phage in phageDict:
         else:
             feature = SeqFeature(FeatureLocation(phageDict[phage][geneRegion]["start"], phageDict[phage][geneRegion]["stop"]), strand=+1)
 
-        genomeSet.add_feature(feature, label=True, name=str(geneRegion), label_position="start", sigil="BIGARROW", color="gray")
+        genomeSet.add_feature(feature, label=False, name=str(geneRegion), label_position="start", sigil="BIGARROW", color="slategray")
 
 
 
@@ -162,19 +162,22 @@ for link_tracks in links_file_handle:
         track1 = genomeDiag.tracks[phageTrack[phage1]]
         track2 = genomeDiag.tracks[phageTrack[phage2]]
 
-        color = colors.linearlyInterpolatedColor(colors.white, colors.firebrick, 0, 100, score)
+        color = colors.linearlyInterpolatedColor(colors.white, colors.lightcoral, 0, 100, score)
+        borderColor = None
 
-        if phage1 == "P1_1":
-            link_xy = CrossLink((track1, phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"]), (track2, phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"]), color=color, flip=False)
+        if phage1Full == "OCN008_K139_region.fa" or phage1Full == "RE98_web_2_ep3.fa" or phage1Full == "RE98_web_1_kappa.fa":
+            link_xy = CrossLink((track1, phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"]), (track2, phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"]), color=color, flip=True, border=borderColor)
         else:
-            link_xy = CrossLink((track1, phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"]), (track2, phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"]), color=color, flip=True)
+            link_xy = CrossLink((track1, phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"]), (track2, phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"]), color=color, flip=False, border=borderColor)
 
         # add link features to first track
 
         BoxFeatureTrack1 = SeqFeature(FeatureLocation(phageDict[phage1Full][phage1_gene]["start"], phageDict[phage1Full][phage1_gene]["stop"], strand=0))
 
+        borderBoxColor = colors.white
+
         genomeSet = track1.new_set()
-        genomeSet.add_feature(BoxFeatureTrack1, label=False, label_position="start", sigil="BOX", color=color)
+        genomeSet.add_feature(BoxFeatureTrack1, label=False, label_position="start", sigil="BOX", color=color, border=borderBoxColor)
         genomeDiag.cross_track_links.append(link_xy)
 
         if "rev" in phageDict[phage1Full][phage1_gene]:
@@ -191,7 +194,7 @@ for link_tracks in links_file_handle:
         else:
             print "still need more colors"
 
-        genomeSet.add_feature(feature, label=True, name=str(geneRegion), label_position="start", sigil="BIGARROW", color=arrowColor)
+        genomeSet.add_feature(feature, label=False, name=None, label_position="start", sigil="BIGARROW", color=arrowColor)
 
 
         # add link features to second track
@@ -199,7 +202,7 @@ for link_tracks in links_file_handle:
         BoxFeatureTrack2 = SeqFeature(FeatureLocation(phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"], strand=0))
 
         genomeSet = track2.new_set()
-        genomeSet.add_feature(BoxFeatureTrack2, label=False, label_position="start", sigil="BOX", color=color)
+        genomeSet.add_feature(BoxFeatureTrack2, label=False, label_position="start", sigil="BOX", color=color, border=borderBoxColor)
         genomeDiag.cross_track_links.append(link_xy)
         
         if "rev" in phageDict[phage2Full][phage2_gene]:
@@ -207,7 +210,7 @@ for link_tracks in links_file_handle:
         else:
             feature = SeqFeature(FeatureLocation(phageDict[phage2Full][phage2_gene]["start"], phageDict[phage2Full][phage2_gene]["stop"]), strand=+1)
 
-        genomeSet.add_feature(feature, label=True, name=str(geneRegion), label_position="start", sigil="BIGARROW", color=arrowColor)
+        genomeSet.add_feature(feature, label=False, name=None, label_position="start", sigil="BIGARROW", color=arrowColor)
 
 
 
